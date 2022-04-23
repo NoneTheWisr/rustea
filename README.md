@@ -24,10 +24,9 @@ Docs can be found on [docs.rs](https://docs.rs/rustea).
 An example demonstrating a website length checker, with batched asynchronous commands.
 
 ```rust
-use crossterm::event::KeyModifiers;
 use rustea::{
     command,
-    crossterm::event::{KeyCode, KeyEvent},
+    crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
     view_helper::input::Input,
     App, Command, Message,
 };
