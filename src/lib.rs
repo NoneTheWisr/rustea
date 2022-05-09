@@ -9,17 +9,15 @@ pub mod command;
 
 use std::{
     any::Any,
-    io::{stdout, Result, Stdout},
+    io::{stdout, Result},
     sync::mpsc::{self, Sender},
     thread,
 };
 
 use crossterm::{
-    cursor,
     event::{read, Event},
     execute,
     style::Print,
-    terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType},
 };
 
 /// Any boxed type that may or may not contain data.
@@ -91,13 +89,6 @@ pub trait App {
     fn view(&self) -> String;
 }
 
-/// Enables mouse capture events on your application.
-///
-/// This is optional as it can cause a spam of your update method.
-pub fn enable_mouse_capture() -> Result<()> {
-    execute!(stdout(), crossterm::event::EnableMouseCapture)
-}
-
 /// Runs your application.
 ///
 /// This will begin listening for keyboard events, and dispatching them to your application.
@@ -137,9 +128,8 @@ pub fn run(app: impl App) -> Result<()> {
         });
     });
 
-    initialize(&mut stdout, &app, cmd_tx2)?;
-    let mut prev = normalized_view(&app);
-    execute!(stdout, Print(&prev))?;
+    initialize(&app, cmd_tx2);
+    execute!(stdout, Print(app.view()))?;
 
     loop {
         let msg = msg_rx.recv().unwrap();
@@ -154,48 +144,14 @@ pub fn run(app: impl App) -> Result<()> {
             cmd_tx.send(cmd).unwrap();
         }
 
-        let curr = normalized_view(&app);
-        clear_lines(&mut stdout, prev.matches("\r\n").count())?;
-        execute!(stdout, Print(&curr))?;
-        prev = curr;
-    }
-
-    deinitialize(&mut stdout)
-}
-
-fn initialize(stdout: &mut Stdout, app: &impl App, cmd_tx: Sender<Command>) -> Result<()> {
-    if let Some(cmd) = app.init() {
-        cmd_tx.send(cmd).unwrap();
-    }
-
-    enable_raw_mode()?;
-    execute!(stdout, cursor::Hide)
-}
-
-fn normalized_view(app: &impl App) -> String {
-    let view = app.view();
-    let view = if !view.ends_with('\n') {
-        view + "\n"
-    } else {
-        view
-    };
-    view.replace('\n', "\r\n")
-}
-
-fn clear_lines(stdout: &mut Stdout, count: usize) -> Result<()> {
-    for _ in 0..count {
-        execute!(
-            stdout,
-            cursor::MoveToPreviousLine(1),
-            Clear(ClearType::CurrentLine)
-        )?;
+        execute!(stdout, Print(app.view()))?;
     }
 
     Ok(())
 }
 
-fn deinitialize(stdout: &mut Stdout) -> Result<()> {
-    execute!(stdout, cursor::Show)?;
-    execute!(stdout, crossterm::event::DisableMouseCapture)?;
-    disable_raw_mode()
+fn initialize(app: &impl App, cmd_tx: Sender<Command>) {
+    if let Some(cmd) = app.init() {
+        cmd_tx.send(cmd).unwrap();
+    }
 }
