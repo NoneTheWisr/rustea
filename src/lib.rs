@@ -9,16 +9,12 @@ pub mod command;
 
 use std::{
     any::Any,
-    io::{stdout, Result},
+    io::{stdout, Result, Write},
     sync::mpsc::{self, Sender},
     thread,
 };
 
-use crossterm::{
-    event::{read, Event},
-    execute,
-    style::Print,
-};
+use crossterm::event::{read, Event};
 
 /// Any boxed type that may or may not contain data.
 /// They are fed to your applications `update` method to tell it how and what to update.
@@ -76,7 +72,6 @@ pub struct ResizeEvent(pub u16, pub u16);
 /// It optionally returns a `Command`.
 ///
 /// `view` is called after every `update` and is responsible for rendering the model.
-/// It returns a `String` that is printed to the screen.
 /// You are _not_ allowed to mutate the state of your application in the view, only render it.
 ///
 /// For examples, check the `examples` directory.
@@ -86,7 +81,7 @@ pub trait App {
     }
 
     fn update(&mut self, msg: Message) -> Option<Command>;
-    fn view(&self) -> String;
+    fn view(&self, stdout: &mut impl Write);
 }
 
 /// Runs your application.
@@ -129,7 +124,7 @@ pub fn run(app: impl App) -> Result<()> {
     });
 
     initialize(&app, cmd_tx2);
-    execute!(stdout, Print(app.view()))?;
+    app.view(&mut stdout);
 
     loop {
         let msg = msg_rx.recv().unwrap();
@@ -144,7 +139,7 @@ pub fn run(app: impl App) -> Result<()> {
             cmd_tx.send(cmd).unwrap();
         }
 
-        execute!(stdout, Print(app.view()))?;
+        app.view(&mut stdout);
     }
 
     Ok(())
